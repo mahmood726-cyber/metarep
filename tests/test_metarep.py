@@ -184,9 +184,9 @@ class TestMetaRep(unittest.TestCase):
         self.assertIsNotNone(csp)
         self.assertIn('default-src', csp)
 
-    # 17: aria-live on results
+    # 17: aria-live on gauge (narrowed to reduce screen reader noise)
     def test_17_aria_live(self):
-        self.assertEqual(self.d.find_element(By.ID, 'results').get_attribute('aria-live'), 'polite')
+        self.assertEqual(self.d.find_element(By.ID, 'gauge').get_attribute('aria-live'), 'polite')
 
     # 18: Slider updates
     def test_18_slider(self):

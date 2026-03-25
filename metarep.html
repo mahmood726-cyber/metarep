@@ -123,7 +123,7 @@
           <div><label for="se">SE (theta)</label><input type="number" id="se" step="0.001" value="0.058" /></div>
         </div>
         <div class="row">
-          <div><label for="tau2">tau-squared</label><input type="number" id="tau2" step="0.001" min="0" value="0" /></div>
+          <div><label for="tau2" title="Enter on analysis scale (log scale for ratio measures)">tau-squared</label><input type="number" id="tau2" step="0.001" min="0" value="0" aria-describedby="tau2Hint" /><span id="tau2Hint" class="sr-only">Enter on log scale for ratio measures</span></div>
           <div><label for="kStudies">Studies (k)</label><input type="number" id="kStudies" step="1" min="1" value="2" /></div>
         </div>
         <div class="row">
@@ -138,16 +138,16 @@
                  role="slider" aria-valuemin="50" aria-valuemax="20000" aria-valuenow="2500" aria-label="Sample size per arm" />
         </div>
 
-        <button class="btn" onclick="compute()">Compute Replication Probability</button>
+        <button class="btn" type="button" onclick="compute()">Compute Replication Probability</button>
       </div>
     </div>
 
     <!-- RIGHT: Results -->
     <div>
-      <div class="card" aria-live="polite" aria-atomic="true" id="results">
+      <div class="card" id="results">
         <h2 class="card-t">Replication Probability</h2>
 
-        <div class="gauge high" id="gauge">
+        <div class="gauge high" id="gauge" aria-live="polite" aria-atomic="true">
           <div class="gauge-val" id="repProb">—</div>
           <div class="gauge-lbl">P(next study significant &amp; same direction)</div>
           <div class="gauge-sub" id="repVerdict"></div>
@@ -295,25 +295,29 @@ function classicalPower(theta, seNew, alpha) {
 }
 
 /**
- * Find minimum N per arm for target replication probability.
- * Binary search on N.
+ * Compute SE for a new study given sample size per arm and the analysis scale.
+ * @param {string} scaleType — 'ratio', 'log', or 'diff'
+ * @param {number} nPerArm — sample size per arm
+ * @param {number} sePooled — pooled SE (log scale for ratio, raw for diff)
+ * @param {number} k — number of studies (used to back-calculate typical per-study SE)
+ * @returns {number} se_new for the hypothetical study
  */
-function minNForRep(theta, tau2, alpha, targetRep) {
-  if (Math.abs(theta) < 1e-10) return Infinity;
-  let lo = 10, hi = 1000000;
-  for (let i = 0; i < 50; i++) {
-    const mid = Math.floor((lo + hi) / 2);
-    const seNew = Math.abs(theta) / (Math.abs(theta) * Math.sqrt(mid / 2)); // approximation
-    // More accurate: for log-scale, se ~ sqrt(4/n_total) = sqrt(2/n_per_arm) for HR/OR
-    const se = 1 / Math.sqrt(mid / 2); // simplified: se ≈ 1/sqrt(n/2) for standardized effects
-    // Actually use the input-agnostic form: se_new for sample size n_per_arm
-    // For a generic effect: se ∝ 1/sqrt(n). Use 2/sqrt(2*n_per_arm) as approx
-    const seTest = 2 / Math.sqrt(2 * mid);
-    const prob = repProb(theta, tau2, seTest, alpha);
-    if (prob >= targetRep) hi = mid;
-    else lo = mid + 1;
+function seForNewStudy(scaleType, nPerArm, sePooled, k) {
+  if (scaleType === 'ratio' || scaleType === 'log') {
+    // Log-HR/OR: SE ~ sqrt(4/events). Assuming ~50% event rate: SE ~ sqrt(2/n_arm)
+    // Note: this assumes 50% event rate; lower rates → larger SE
+    return Math.sqrt(2 / nPerArm);
   }
-  return hi;
+  // Difference scale: typical per-study SE ~ sePooled * sqrt(k)
+  // Scale by sample size ratio: se_new = typicalSE * sqrt(typicalN / nPerArm)
+  // Since typicalSE ~ sePooled * sqrt(k), and typical n ~ total/k:
+  // se_new ~ sePooled * sqrt(k) * sqrt(1) for similar-sized studies
+  // More simply: treat sePooled * sqrt(k) as a single-study SE, then scale by sqrt(n_ratio)
+  const typicalSE = sePooled * Math.sqrt(k);
+  // We don't know the original per-study N, so assume the typical study is n=200 per arm
+  // and scale from there: se_new = typicalSE * sqrt(200 / nPerArm)
+  const refN = 200;
+  return typicalSE * Math.sqrt(refN / nPerArm);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -385,25 +389,20 @@ function compute() {
   if (scaleType === 'ratio') {
     if (theta <= 0) { document.getElementById('repProb').textContent = 'Ratio must be > 0'; return; }
     thetaLog = Math.log(theta);
-    // Delta method: SE on log scale ≈ SE / theta
+    // Delta method: SE on log scale ≈ SE / theta (accurate near theta=1; degrades for extreme ratios)
     seLog = se / theta;
-    // tau2 on log scale: approximate from I2 if tau2 not directly provided
-    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * i2 / (100 - i2) : 0);
+    // tau2 on log scale: use entered tau2 if > 0; otherwise approximate from I2
+    // I2 = tau2 / (tau2 + typical_vi). Typical vi ≈ sePooled^2 * k (since se_pooled ~ se_typical/sqrt(k))
+    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * k * i2 / (100 - i2) : 0);
   } else if (scaleType === 'diff') {
     thetaLog = theta; // already on additive scale
     seLog = se;
-    tau2Log = tau2;
+    // Same I2-to-tau2 correction: typical vi ≈ sePooled^2 * k
+    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * k * i2 / (100 - i2) : 0);
   }
 
-  // SE of next study given sample size
-  // For ratio: se_new ≈ sqrt(4 / (2 * nPerArm)) = sqrt(2/nPerArm) on log scale (Schoenfeld approx)
-  // For diff: se_new ≈ SD * sqrt(2/nPerArm), use current SE * sqrt(N_current) as reference
-  // Simplified: scale current SE by sqrt(N) ratio
-  const seNew = seLog * Math.sqrt(k) > 0 ? Math.abs(thetaLog) / (Math.abs(thetaLog) / seLog * Math.sqrt(nPerArm / 1000)) : seLog;
-  // More principled: se_new = 1/sqrt(nPerArm/2) for standardized effects; for non-standardized, use reference
-  const seNewCalc = scaleType === 'ratio'
-    ? Math.sqrt(2 / nPerArm) // log-HR/OR SE ≈ sqrt(4/N) = sqrt(2/n_arm)
-    : seLog * Math.sqrt((2 * k) / (2 * nPerArm)); // scale by sample size ratio
+  // SE of next study at the specified sample size
+  const seNewCalc = seForNewStudy(scaleType, nPerArm, seLog, k);
 
   // Core computation
   const pRep = repProb(thetaLog, tau2Log, seNewCalc, alpha);
@@ -431,15 +430,16 @@ function compute() {
   // Min N for 80% replication
   let minN80 = '—';
   if (Math.abs(thetaLog) > 1e-10) {
-    // Binary search
-    for (let n = 50; n <= 500000; n = Math.min(n + Math.max(50, Math.floor(n * 0.1)), 500000)) {
-      const seTest = scaleType === 'ratio' ? Math.sqrt(2 / n) : seLog * Math.sqrt((2 * k) / (2 * n));
-      if (repProb(thetaLog, tau2Log, seTest, alpha) >= 0.80) {
-        minN80 = n.toLocaleString();
-        break;
-      }
-      if (n >= 500000) { minN80 = '>500K'; break; }
+    // Binary search for minimum N
+    let lo = 50, hi = 500000;
+    for (let iter = 0; iter < 30; iter++) {
+      const mid = Math.floor((lo + hi) / 2);
+      const seTest = seForNewStudy(scaleType, mid, seLog, k);
+      if (repProb(thetaLog, tau2Log, seTest, alpha) >= 0.80) hi = mid;
+      else lo = mid + 1;
     }
+    minN80 = repProb(thetaLog, tau2Log, seForNewStudy(scaleType, hi, seLog, k), alpha) >= 0.80
+      ? hi.toLocaleString() : '>500K';
   }
 
   // ── Update DOM ──
@@ -468,11 +468,11 @@ function compute() {
   // Replication curve
   renderRepCurve(thetaLog, tau2Log, seLog, k, alpha, scaleType, nPerArm);
 
-  // Store for export
-  window._lastRep = {
+  // Store for export (only after all computations succeed)
+  window._lastRep = Object.freeze({
     theta: thetaLog, se: seLog, tau2: tau2Log, k, i2, alpha, nPerArm,
     pRep, pClassical, expectedRepRate, minN80, scaleType
-  };
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════
