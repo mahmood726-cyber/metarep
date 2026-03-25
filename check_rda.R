@@ -1,0 +1,7 @@
+d <- get(load("C:/Models/Pairwise70/data/CD000028_pub4_data.rda"))
+cat("Class:", class(d), "\n")
+cat("Cols:", paste(names(d), collapse=", "), "\n")
+cat("Rows:", nrow(d), "\n")
+cat("Mean:", head(d$Mean, 5), "\n")
+cat("CI.start:", head(d$CI.start, 5), "\n")
+cat("CI.end:", head(d$CI.end, 5), "\n")
