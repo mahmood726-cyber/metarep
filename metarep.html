@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- CSP: unsafe-inline needed for single-file app; unsafe-eval needed by Plotly expression parser -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plot.ly; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self';" />
+  <title>MetaRep — Replication Probability from Meta-Analytic Evidence</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root {
+      --bg:#f4f6f8; --bg-card:#fff; --text:#1a1a2e; --muted:#6b7280; --accent:#2563eb;
+      --border:#e5e7eb; --success:#059669; --warning:#d97706; --danger:#dc2626;
+      --green-bg:#d1fae5; --amber-bg:#fef3c7; --red-bg:#fee2e2; --shadow:0 1px 6px rgba(0,0,0,.07);
+    }
+    [data-theme="dark"] {
+      --bg:#0f172a; --bg-card:#1e293b; --text:#e2e8f0; --muted:#94a3b8; --accent:#60a5fa;
+      --border:#334155; --success:#34d399; --warning:#fbbf24; --danger:#f87171;
+      --green-bg:#064e3b; --amber-bg:#451a03; --red-bg:#450a0a; --shadow:0 1px 6px rgba(0,0,0,.3);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+    /* Header */
+    .hdr{background:var(--bg-card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+    .hdr h1{font-size:1.3rem;font-weight:800;color:var(--accent);letter-spacing:-.5px}
+    .hdr-sub{font-size:.8rem;color:var(--muted);font-weight:400}
+    .hdr-btns{display:flex;gap:8px}
+    .hdr-btns button{background:none;border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.85rem}
+    .hdr-btns button:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .hdr-btns button:focus{outline:2px solid var(--accent);outline-offset:2px}
+
+    /* Layout */
+    .wrap{max-width:1280px;margin:0 auto;padding:20px}
+    .grid{display:grid;grid-template-columns:400px 1fr;gap:20px}
+    @media(max-width:960px){.grid{grid-template-columns:1fr}}
+    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;box-shadow:var(--shadow)}
+    .card-t{font-size:1rem;font-weight:700;margin-bottom:12px;color:var(--accent)}
+
+    /* Forms */
+    label{display:block;font-size:.82rem;font-weight:600;margin-bottom:3px;color:var(--muted)}
+    input,select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:.9rem}
+    input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+    .row{display:flex;gap:10px;margin-bottom:10px}
+    .row>div{flex:1}
+    .grp{margin-bottom:12px}
+
+    /* Gauge */
+    .gauge{text-align:center;padding:24px;border-radius:12px;margin-bottom:16px}
+    .gauge.high{background:var(--green-bg)} .gauge.mod{background:var(--amber-bg)} .gauge.low{background:var(--red-bg)}
+    .gauge-val{font-size:3.2rem;font-weight:900;line-height:1}
+    .gauge-lbl{font-size:.82rem;color:var(--muted);margin-top:4px}
+    .gauge-sub{font-size:.9rem;margin-top:8px}
+
+    /* Metrics */
+    .mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+    .mb{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+    .mb .v{font-size:1.3rem;font-weight:700} .mb .l{font-size:.73rem;color:var(--muted)}
+
+    /* Buttons */
+    .btn{background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;width:100%}
+    .btn:hover{opacity:.9} .btn:focus{outline:2px solid var(--accent);outline-offset:2px}
+    .btn-sm{padding:6px 14px;font-size:.82rem;width:auto}
+
+    /* Range */
+    input[type="range"]{-webkit-appearance:none;height:6px;border-radius:3px;background:var(--border);outline:none;margin:8px 0}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer}
+    .slider-val{font-size:1.1rem;font-weight:700;color:var(--accent);text-align:center}
+
+    /* Modal */
+    .modal-ov{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center}
+    .modal-ov.hidden{display:none}
+    .modal{background:var(--bg-card);border-radius:12px;max-width:650px;width:90%;max-height:80vh;overflow-y:auto;padding:24px;position:relative}
+    .modal h2{margin-bottom:12px} .modal h3{margin-top:16px;margin-bottom:6px;font-size:.95rem}
+    .modal-x{position:absolute;top:12px;right:16px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text)}
+    .modal-x:focus{outline:2px solid var(--accent)}
+
+    /* Table */
+    .tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:12px}
+    .tbl th,.tbl td{padding:6px 10px;border:1px solid var(--border);text-align:left}
+    .tbl th{background:var(--bg);font-weight:600;color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.3px}
+    .tbl td.num{text-align:right;font-family:'SF Mono',Consolas,monospace}
+  </style>
+</head>
+<body>
+<a href="#main" class="sr-only" style="position:absolute;left:-9999px" onfocus="this.style.cssText='position:fixed;top:0;left:0;z-index:9999;padding:8px 16px;background:var(--accent);color:#fff;font-size:1rem;text-decoration:none;border-radius:4px'" onblur="this.style.cssText='position:absolute;left:-9999px'">Skip to content</a>
+
+<header class="hdr">
+  <div><h1>MetaRep <span class="hdr-sub">Replication Probability from Meta-Analytic Evidence</span></h1></div>
+  <div class="hdr-btns">
+    <button id="aboutBtn">About</button>
+    <button id="themeBtn">Dark Mode</button>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <div class="grid">
+    <!-- LEFT: Input -->
+    <div>
+      <div class="card">
+        <h2 class="card-t">Meta-Analysis Input</h2>
+        <div class="grp">
+          <label for="exSel">Load Example</label>
+          <select id="exSel">
+            <option value="">— Custom —</option>
+            <option value="dapahf" selected>DAPA-HF (SGLT2i in HFrEF)</option>
+            <option value="statins">CTT Statins Primary Prevention</option>
+            <option value="ssri">SSRIs for Depression (Cipriani 2018)</option>
+          </select>
+        </div>
+        <div class="grp">
+          <label for="scale">Effect Scale</label>
+          <select id="scale">
+            <option value="log">Log scale (OR, RR, HR → enter log-transformed)</option>
+            <option value="ratio" selected>Ratio scale (enter OR/RR/HR directly)</option>
+            <option value="diff">Difference scale (MD, SMD)</option>
+          </select>
+        </div>
+        <div class="row">
+          <div><label for="theta">Pooled Effect (theta)</label><input type="number" id="theta" step="0.01" value="0.74" /></div>
+          <div><label for="se">SE (theta)</label><input type="number" id="se" step="0.001" value="0.058" /></div>
+        </div>
+        <div class="row">
+          <div><label for="tau2">tau-squared</label><input type="number" id="tau2" step="0.001" min="0" value="0" /></div>
+          <div><label for="kStudies">Studies (k)</label><input type="number" id="kStudies" step="1" min="1" value="2" /></div>
+        </div>
+        <div class="row">
+          <div><label for="i2">I-squared (%)</label><input type="number" id="i2" step="1" min="0" max="100" value="0" /></div>
+          <div><label for="alpha">Alpha (two-sided)</label><input type="number" id="alpha" step="0.01" min="0.001" max="0.20" value="0.05" /></div>
+        </div>
+
+        <div class="grp">
+          <label>Sample Size of Next Study (per arm)</label>
+          <div class="slider-val" id="nDisp">2,500</div>
+          <input type="range" id="nNew" min="50" max="20000" step="50" value="2500"
+                 role="slider" aria-valuemin="50" aria-valuemax="20000" aria-valuenow="2500" aria-label="Sample size per arm" />
+        </div>
+
+        <button class="btn" onclick="compute()">Compute Replication Probability</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Results -->
+    <div>
+      <div class="card" aria-live="polite" aria-atomic="true" id="results">
+        <h2 class="card-t">Replication Probability</h2>
+
+        <div class="gauge high" id="gauge">
+          <div class="gauge-val" id="repProb">—</div>
+          <div class="gauge-lbl">P(next study significant &amp; same direction)</div>
+          <div class="gauge-sub" id="repVerdict"></div>
+        </div>
+
+        <div class="mg">
+          <div class="mb"><div class="v" id="mExpRep">—</div><div class="l">Expected Replication Rate<br>(among k studies)</div></div>
+          <div class="mb"><div class="v" id="mMinN">—</div><div class="l">Min N per arm for<br>80% replication</div></div>
+          <div class="mb"><div class="v" id="mPredPower">—</div><div class="l">Predictive Power<br>(heterogeneity-adjusted)</div></div>
+          <div class="mb"><div class="v" id="mClassical">—</div><div class="l">Classical Power<br>(ignoring heterogeneity)</div></div>
+        </div>
+
+        <!-- Replication curve -->
+        <div id="repCurve" style="width:100%;height:340px"></div>
+
+        <!-- Study-level table -->
+        <div id="studyTable" style="margin-top:16px"></div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-sm" onclick="exportBundle()">Export JSON Bundle</button>
+          <button class="btn btn-sm" onclick="exportR()">Export R Script</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- About Modal -->
+<div class="modal-ov hidden" id="aboutModal" role="dialog" aria-modal="true" aria-labelledby="aboutT">
+  <div class="modal">
+    <button class="modal-x" id="aboutX" aria-label="Close">&times;</button>
+    <h2 id="aboutT">MetaRep v1.0.0</h2>
+    <p><strong>Replication Probability from Meta-Analytic Evidence</strong></p>
+    <p>Answers the question: <em>"Given this meta-analysis, what is the probability that the next study will find a significant result in the same direction?"</em></p>
+
+    <h3>The Formula</h3>
+    <p>Let theta be the pooled effect (log scale), SE its standard error, tau^2 the between-study variance, and se_new the SE of a hypothetical new study. The true effect in the next study is theta_new ~ N(theta, tau^2), and the observed result is Y_new ~ N(theta_new, se_new^2). Marginally:</p>
+    <p style="text-align:center;font-family:monospace;font-size:.9rem;margin:12px 0">
+      Y_new ~ N(theta, tau^2 + se_new^2)
+    </p>
+    <p>The replication probability (significance + correct direction) is:</p>
+    <p style="text-align:center;font-family:monospace;font-size:.85rem;margin:12px 0">
+      P(rep) = Phi((|theta| - z_alpha * se_new) / sqrt(tau^2 + se_new^2))
+    </p>
+    <p>where Phi is the standard normal CDF and z_alpha = z_{alpha/2} for a two-sided test.</p>
+
+    <h3>Key Insight</h3>
+    <p>Classical power analysis assumes the true effect equals the pooled estimate. MetaRep incorporates <strong>heterogeneity (tau^2)</strong> into the prediction, recognizing that the next study's true effect will differ from the pooled average. This is why "predictive power" is always &le; classical power when tau^2 > 0.</p>
+
+    <h3>Expected Replication Rate</h3>
+    <p>For each of the k studies already in the meta-analysis, we compute the probability that a study of the same size would replicate, then average. This tells you: "how many of the existing studies would you expect to replicate if you re-ran them?"</p>
+
+    <h3>Limitations</h3>
+    <ul style="font-size:.85rem;padding-left:20px">
+      <li>Assumes normal distribution for effects (may not hold for small studies or rare events)</li>
+      <li>Uses the pooled estimate and tau^2 as known — does not account for estimation uncertainty</li>
+      <li>Replication is defined as p &lt; alpha AND same direction — not exact replication of effect size</li>
+      <li>Does not account for publication bias or p-hacking in the original studies</li>
+    </ul>
+
+    <h3>References</h3>
+    <ul style="font-size:.85rem;padding-left:20px">
+      <li>Patil P, Peng RD, Leek JT (2016). What should researchers expect when they replicate studies? Estimating the probability of replication. <em>PLoS ONE</em> 11:e0158823.</li>
+      <li>IntHout J et al. (2016). Plea for routinely presenting prediction intervals in meta-analysis. <em>BMJ Open</em> 6:e010247.</li>
+      <li>Higgins JPT et al. (2009). A re-evaluation of random-effects meta-analysis. <em>JRSS-A</em> 172:137-159.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════════ */
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function pNum(id, fb) { const v = parseFloat(document.getElementById(id).value); return isFinite(v) ? v : fb; }
+function pInt(id, fb) { const v = parseInt(document.getElementById(id).value); return isFinite(v) ? v : fb; }
+
+function normalCDF(x) {
+  if (x > 8) return 1; if (x < -8) return 0;
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const s = x < 0 ? -1 : 1;
+  const ax = Math.abs(x) / Math.sqrt(2);
+  const t = 1 / (1 + p * ax);
+  const y = 1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-ax*ax);
+  return 0.5 * (1 + s * y);
+}
+
+function normalQuantile(p) {
+  if (p <= 0) return -Infinity; if (p >= 1) return Infinity; if (p === 0.5) return 0;
+  const pLow = p < 0.5 ? p : 1 - p;
+  const t = Math.sqrt(-2 * Math.log(pLow));
+  let z = t - (2.515517 + 0.802853*t + 0.010328*t*t) / (1 + 1.432788*t + 0.189269*t*t + 0.001308*t*t*t);
+  return p < 0.5 ? -z : z;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CORE: REPLICATION PROBABILITY
+═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * Compute P(next study is significant AND in the same direction as theta).
+ *
+ * Model: theta_new ~ N(theta, tau2), Y_new ~ N(theta_new, se_new^2)
+ * Marginal: Y_new ~ N(theta, tau2 + se_new^2)
+ * Z_new = Y_new / se_new
+ *
+ * P(rep) = P(Y_new/se_new > z_alpha AND sign(Y_new) = sign(theta))
+ *
+ * For theta > 0:
+ *   P(rep) = P(Y_new > z_alpha * se_new)  where Y_new ~ N(theta, tau2+se_new^2)
+ *          = Phi((theta - z_alpha * se_new) / sqrt(tau2 + se_new^2))
+ *
+ * For theta < 0: symmetric, use |theta|
+ * For theta = 0: P(rep) = alpha/2 (random significance in one direction)
+ *
+ * @param {number} theta  — pooled effect (log scale for ratios, raw for differences)
+ * @param {number} tau2   — between-study variance
+ * @param {number} seNew  — standard error of the hypothetical new study
+ * @param {number} alpha  — two-sided significance level (default 0.05)
+ * @returns {number} P(replication) in [0, 1]
+ */
+function repProb(theta, tau2, seNew, alpha) {
+  if (!isFinite(theta) || !isFinite(tau2) || !isFinite(seNew) || seNew <= 0) return 0;
+  const zAlpha = normalQuantile(1 - (alpha ?? 0.05) / 2);
+  const absTheta = Math.abs(theta);
+  const predSD = Math.sqrt(tau2 + seNew * seNew);
+  if (predSD <= 0) return absTheta > zAlpha * seNew ? 1 : 0;
+  return normalCDF((absTheta - zAlpha * seNew) / predSD);
+}
+
+/**
+ * Classical power (ignoring heterogeneity — assumes true effect = theta exactly).
+ */
+function classicalPower(theta, seNew, alpha) {
+  const zAlpha = normalQuantile(1 - (alpha ?? 0.05) / 2);
+  const absTheta = Math.abs(theta);
+  return normalCDF(absTheta / seNew - zAlpha);
+}
+
+/**
+ * Find minimum N per arm for target replication probability.
+ * Binary search on N.
+ */
+function minNForRep(theta, tau2, alpha, targetRep) {
+  if (Math.abs(theta) < 1e-10) return Infinity;
+  let lo = 10, hi = 1000000;
+  for (let i = 0; i < 50; i++) {
+    const mid = Math.floor((lo + hi) / 2);
+    const seNew = Math.abs(theta) / (Math.abs(theta) * Math.sqrt(mid / 2)); // approximation
+    // More accurate: for log-scale, se ~ sqrt(4/n_total) = sqrt(2/n_per_arm) for HR/OR
+    const se = 1 / Math.sqrt(mid / 2); // simplified: se ≈ 1/sqrt(n/2) for standardized effects
+    // Actually use the input-agnostic form: se_new for sample size n_per_arm
+    // For a generic effect: se ∝ 1/sqrt(n). Use 2/sqrt(2*n_per_arm) as approx
+    const seTest = 2 / Math.sqrt(2 * mid);
+    const prob = repProb(theta, tau2, seTest, alpha);
+    if (prob >= targetRep) hi = mid;
+    else lo = mid + 1;
+  }
+  return hi;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUILT-IN EXAMPLES
+═══════════════════════════════════════════════════════════════════ */
+
+const EXAMPLES = {
+  dapahf: {
+    label: 'DAPA-HF (SGLT2i in HFrEF)',
+    scale: 'ratio', theta: 0.74, se: 0.058, tau2: 0, k: 2, i2: 0, alpha: 0.05,
+    nNew: 2500,
+    studies: [
+      { label: 'DAPA-HF', n: 4744, effect: 0.74, se: 0.082 },
+      { label: 'EMPEROR-Reduced', n: 3730, effect: 0.75, se: 0.083 }
+    ],
+    source: 'McMurray et al. NEJM 2019 + Packer et al. NEJM 2020'
+  },
+  statins: {
+    label: 'CTT Statins Primary Prevention',
+    scale: 'ratio', theta: 0.75, se: 0.020, tau2: 0.005, k: 19, i2: 34, alpha: 0.05,
+    nNew: 5000,
+    studies: [
+      { label: 'WOSCOPS', n: 6595, effect: 0.69, se: 0.12 },
+      { label: 'AFCAPS', n: 6605, effect: 0.63, se: 0.13 },
+      { label: 'ASCOT-LLA', n: 10305, effect: 0.64, se: 0.11 },
+      { label: 'CARDS', n: 2838, effect: 0.63, se: 0.17 },
+      { label: 'JUPITER', n: 17802, effect: 0.56, se: 0.12 },
+      { label: 'MEGA', n: 7832, effect: 0.67, se: 0.15 }
+    ],
+    source: 'CTT Collaborators, Lancet 2012'
+  },
+  ssri: {
+    label: 'SSRIs for Major Depression',
+    scale: 'diff', theta: -2.31, se: 0.30, tau2: 2.69, k: 72, i2: 52, alpha: 0.05,
+    nNew: 200,
+    studies: [
+      { label: 'Fluoxetine pooled', n: 3200, effect: -2.0, se: 0.45 },
+      { label: 'Sertraline pooled', n: 2800, effect: -2.5, se: 0.50 },
+      { label: 'Paroxetine pooled', n: 2100, effect: -2.8, se: 0.55 },
+      { label: 'Escitalopram pooled', n: 1900, effect: -2.1, se: 0.52 }
+    ],
+    source: 'Cipriani et al. Lancet 2018 (SMD ≈ -0.30, converted to HDRS points)'
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMPUTE ENGINE
+═══════════════════════════════════════════════════════════════════ */
+
+function compute() {
+  const scaleType = document.getElementById('scale').value;
+  let theta = pNum('theta', NaN);
+  const se = pNum('se', NaN);
+  const tau2 = pNum('tau2', 0);
+  const k = pInt('kStudies', 2);
+  const i2 = pNum('i2', 0);
+  const alpha = pNum('alpha', 0.05);
+  const nPerArm = pInt('nNew', 2500);
+
+  if (!isFinite(theta) || !isFinite(se) || se <= 0) {
+    document.getElementById('repProb').textContent = 'Invalid input';
+    return;
+  }
+
+  // Convert to log scale if ratio entered
+  let thetaLog = theta;
+  let seLog = se;
+  let tau2Log = tau2;
+  if (scaleType === 'ratio') {
+    if (theta <= 0) { document.getElementById('repProb').textContent = 'Ratio must be > 0'; return; }
+    thetaLog = Math.log(theta);
+    // Delta method: SE on log scale ≈ SE / theta
+    seLog = se / theta;
+    // tau2 on log scale: approximate from I2 if tau2 not directly provided
+    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * i2 / (100 - i2) : 0);
+  } else if (scaleType === 'diff') {
+    thetaLog = theta; // already on additive scale
+    seLog = se;
+    tau2Log = tau2;
+  }
+
+  // SE of next study given sample size
+  // For ratio: se_new ≈ sqrt(4 / (2 * nPerArm)) = sqrt(2/nPerArm) on log scale (Schoenfeld approx)
+  // For diff: se_new ≈ SD * sqrt(2/nPerArm), use current SE * sqrt(N_current) as reference
+  // Simplified: scale current SE by sqrt(N) ratio
+  const seNew = seLog * Math.sqrt(k) > 0 ? Math.abs(thetaLog) / (Math.abs(thetaLog) / seLog * Math.sqrt(nPerArm / 1000)) : seLog;
+  // More principled: se_new = 1/sqrt(nPerArm/2) for standardized effects; for non-standardized, use reference
+  const seNewCalc = scaleType === 'ratio'
+    ? Math.sqrt(2 / nPerArm) // log-HR/OR SE ≈ sqrt(4/N) = sqrt(2/n_arm)
+    : seLog * Math.sqrt((2 * k) / (2 * nPerArm)); // scale by sample size ratio
+
+  // Core computation
+  const pRep = repProb(thetaLog, tau2Log, seNewCalc, alpha);
+  const pClassical = classicalPower(thetaLog, seNewCalc, alpha);
+
+  // Expected replication rate across existing studies
+  const ex = EXAMPLES[document.getElementById('exSel').value];
+  let expectedRepRate = null;
+  let studyRows = '';
+  if (ex && ex.studies) {
+    let sumRep = 0;
+    ex.studies.forEach(s => {
+      const sSeLog = scaleType === 'ratio' ? s.se / s.effect : s.se;
+      const sThLog = scaleType === 'ratio' ? Math.log(s.effect) : s.effect;
+      // For each study, compute rep prob using a study of the same size
+      const sSeNew = scaleType === 'ratio' ? Math.sqrt(4 / s.n) : sSeLog;
+      const sRep = repProb(thetaLog, tau2Log, sSeNew, alpha);
+      sumRep += sRep;
+      studyRows += `<tr><td>${escapeHtml(s.label)}</td><td class="num">${s.n.toLocaleString()}</td>` +
+        `<td class="num">${s.effect}</td><td class="num">${(sRep * 100).toFixed(1)}%</td></tr>`;
+    });
+    expectedRepRate = sumRep / ex.studies.length;
+  }
+
+  // Min N for 80% replication
+  let minN80 = '—';
+  if (Math.abs(thetaLog) > 1e-10) {
+    // Binary search
+    for (let n = 50; n <= 500000; n = Math.min(n + Math.max(50, Math.floor(n * 0.1)), 500000)) {
+      const seTest = scaleType === 'ratio' ? Math.sqrt(2 / n) : seLog * Math.sqrt((2 * k) / (2 * n));
+      if (repProb(thetaLog, tau2Log, seTest, alpha) >= 0.80) {
+        minN80 = n.toLocaleString();
+        break;
+      }
+      if (n >= 500000) { minN80 = '>500K'; break; }
+    }
+  }
+
+  // ── Update DOM ──
+  const pPct = (pRep * 100).toFixed(1);
+  document.getElementById('repProb').textContent = pPct + '%';
+  const gauge = document.getElementById('gauge');
+  gauge.className = 'gauge ' + (pRep >= 0.8 ? 'high' : pRep >= 0.5 ? 'mod' : 'low');
+  document.getElementById('repVerdict').textContent =
+    pRep >= 0.8 ? 'High replication probability — robust evidence'
+    : pRep >= 0.5 ? 'Moderate — replication uncertain, consider larger trials'
+    : 'Low — this meta-analytic conclusion may not replicate';
+
+  document.getElementById('mExpRep').textContent = expectedRepRate !== null ? (expectedRepRate * 100).toFixed(0) + '%' : '—';
+  document.getElementById('mMinN').textContent = minN80;
+  document.getElementById('mPredPower').textContent = (pRep * 100).toFixed(1) + '%';
+  document.getElementById('mClassical').textContent = (pClassical * 100).toFixed(1) + '%';
+
+  // Study table
+  if (studyRows) {
+    document.getElementById('studyTable').innerHTML =
+      '<h3 class="card-t" style="font-size:.9rem;margin-top:0">Per-Study Replication Probability</h3>' +
+      '<table class="tbl"><thead><tr><th>Study</th><th>N</th><th>Effect</th><th>P(rep)</th></tr></thead>' +
+      '<tbody>' + studyRows + '</tbody></table>';
+  }
+
+  // Replication curve
+  renderRepCurve(thetaLog, tau2Log, seLog, k, alpha, scaleType, nPerArm);
+
+  // Store for export
+  window._lastRep = {
+    theta: thetaLog, se: seLog, tau2: tau2Log, k, i2, alpha, nPerArm,
+    pRep, pClassical, expectedRepRate, minN80, scaleType
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   REPLICATION PROBABILITY CURVE
+═══════════════════════════════════════════════════════════════════ */
+
+function renderRepCurve(theta, tau2, sePool, k, alpha, scaleType, currentN) {
+  const ns = [], pReps = [], pClassicals = [];
+
+  for (let n = 100; n <= 20000; n += 100) {
+    ns.push(n);
+    const seN = scaleType === 'ratio' ? Math.sqrt(2 / n) : sePool * Math.sqrt((2 * k) / (2 * n));
+    pReps.push(repProb(theta, tau2, seN, alpha) * 100);
+    pClassicals.push(classicalPower(theta, seN, alpha) * 100);
+  }
+
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const fc = dark ? '#e2e8f0' : '#1a1a2e';
+  const gc = dark ? '#334155' : '#e5e7eb';
+
+  Plotly.react('repCurve', [
+    { x: ns, y: pReps, mode: 'lines', name: 'Predictive (with tau\u00B2)', line: { color: '#2563eb', width: 3 } },
+    { x: ns, y: pClassicals, mode: 'lines', name: 'Classical (ignoring tau\u00B2)', line: { color: '#94a3b8', width: 2, dash: 'dash' } },
+    { x: [ns[0], ns[ns.length-1]], y: [80, 80], mode: 'lines', name: '80% threshold',
+      line: { color: '#d97706', width: 1, dash: 'dot' } },
+    { x: [currentN, currentN], y: [0, 100], mode: 'lines', name: 'Current N',
+      line: { color: '#dc2626', width: 2, dash: 'dashdot' }, showlegend: false }
+  ], {
+    title: { text: 'Replication Probability vs Sample Size (per arm)', font: { size: 13 } },
+    xaxis: { title: 'N per arm', color: fc, gridcolor: gc },
+    yaxis: { title: 'P(replication) %', range: [0, 105], color: fc, gridcolor: gc },
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: fc, size: 11 },
+    legend: { x: 0.5, y: -0.18, orientation: 'h', xanchor: 'center' },
+    margin: { t: 35, r: 20, b: 70, l: 55 }
+  }, { responsive: true, displayModeBar: false });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXPORTS
+═══════════════════════════════════════════════════════════════════ */
+
+async function exportBundle() {
+  if (!window._lastRep) { alert('Compute first.'); return; }
+  const r = window._lastRep;
+  const bundle = {
+    '@type': 'MetaRep Replication Bundle', version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    input: { theta: r.theta, se: r.se, tau2: r.tau2, k: r.k, i2: r.i2, alpha: r.alpha, n_per_arm: r.nPerArm },
+    results: { p_replication: +r.pRep.toFixed(4), p_classical_power: +r.pClassical.toFixed(4),
+               expected_rep_rate: r.expectedRepRate !== null ? +r.expectedRepRate.toFixed(4) : null,
+               min_n_80pct: r.minN80 },
+    formula: 'P(rep) = Phi((|theta| - z_alpha * se_new) / sqrt(tau2 + se_new^2))',
+    provenance: { tool: 'MetaRep v1.0.0', reference: 'Patil et al. PLoS ONE 2016 (extended with heterogeneity)' }
+  };
+  const json = JSON.stringify(bundle, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'metarep_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportR() {
+  if (!window._lastRep) { alert('Compute first.'); return; }
+  const r = window._lastRep;
+  const script = `# MetaRep R Validation Script
+# Generated: ${new Date().toISOString()}
+
+theta  <- ${r.theta}     # pooled effect (log scale)
+se     <- ${r.se}        # SE of pooled effect
+tau2   <- ${r.tau2}       # between-study variance
+alpha  <- ${r.alpha}
+n_arm  <- ${r.nPerArm}   # sample size per arm of next study
+se_new <- sqrt(2 / n_arm) # SE of next study (log-HR/OR approx)
+
+# Core formula: P(replication)
+z_alpha <- qnorm(1 - alpha / 2)
+pred_sd <- sqrt(tau2 + se_new^2)
+p_rep   <- pnorm((abs(theta) - z_alpha * se_new) / pred_sd)
+
+# Classical power (ignoring heterogeneity)
+p_classical <- pnorm(abs(theta) / se_new - z_alpha)
+
+cat("=== MetaRep R Validation ===\\n")
+cat(sprintf("theta (log):    %.4f\\n", theta))
+cat(sprintf("tau2:           %.4f\\n", tau2))
+cat(sprintf("se_new (N=%d):  %.4f\\n", n_arm, se_new))
+cat(sprintf("P(replication): %.4f (JS: ${r.pRep.toFixed(4)})\\n", p_rep))
+cat(sprintf("P(classical):   %.4f (JS: ${r.pClassical.toFixed(4)})\\n", p_classical))
+cat(sprintf("Match: %s\\n", ifelse(abs(p_rep - ${r.pRep}) < 0.001, "YES", "NO")))
+
+# Replication curve
+n_range <- seq(100, 20000, by = 100)
+p_curve <- sapply(n_range, function(n) {
+  se_n <- sqrt(2 / n)
+  pnorm((abs(theta) - z_alpha * se_n) / sqrt(tau2 + se_n^2))
+})
+plot(n_range, p_curve, type = "l", col = "blue", lwd = 2,
+     xlab = "N per arm", ylab = "P(replication)",
+     main = "MetaRep: Replication Probability vs Sample Size")
+abline(h = 0.8, col = "orange", lty = 2)
+abline(v = n_arm, col = "red", lty = 3)
+legend("bottomright", c("Predictive", "80% threshold", paste0("N = ", n_arm)),
+       col = c("blue", "orange", "red"), lty = c(1, 2, 3), lwd = c(2, 1, 1))
+`;
+  const blob = new Blob([script], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'metarep_validation.R';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EVENT WIRING
+═══════════════════════════════════════════════════════════════════ */
+
+// Example loader
+document.getElementById('exSel').addEventListener('change', function() {
+  const ex = EXAMPLES[this.value];
+  if (!ex) return;
+  document.getElementById('scale').value = ex.scale;
+  document.getElementById('theta').value = ex.theta;
+  document.getElementById('se').value = ex.se;
+  document.getElementById('tau2').value = ex.tau2;
+  document.getElementById('kStudies').value = ex.k;
+  document.getElementById('i2').value = ex.i2;
+  document.getElementById('alpha').value = ex.alpha;
+  document.getElementById('nNew').value = ex.nNew;
+  document.getElementById('nNew').setAttribute('aria-valuenow', ex.nNew);
+  updateNDisp();
+  compute();
+});
+
+// Slider
+function updateNDisp() {
+  const v = document.getElementById('nNew').value;
+  document.getElementById('nDisp').textContent = parseInt(v).toLocaleString();
+  document.getElementById('nNew').setAttribute('aria-valuenow', v);
+}
+document.getElementById('nNew').addEventListener('input', function() { updateNDisp(); compute(); });
+
+// Dark mode
+document.getElementById('themeBtn').addEventListener('click', function() {
+  const d = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', d ? '' : 'dark');
+  this.textContent = d ? 'Dark Mode' : 'Light Mode';
+  if (window._lastRep) compute();
+});
+
+// About modal
+(function() {
+  const m = document.getElementById('aboutModal'), ob = document.getElementById('aboutBtn'), cb = document.getElementById('aboutX');
+  let _kb = null;
+  function open() {
+    m.classList.remove('hidden'); cb.focus();
+    _kb = function(e) {
+      if (e.key === 'Escape') { close(); e.preventDefault(); }
+      if (e.key === 'Tab') {
+        const f = m.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+        const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey) { if (document.activeElement === first) { last.focus(); e.preventDefault(); } }
+        else { if (document.activeElement === last) { first.focus(); e.preventDefault(); } }
+      }
+    };
+    document.addEventListener('keydown', _kb);
+  }
+  function close() { m.classList.add('hidden'); if (_kb) { document.removeEventListener('keydown', _kb); _kb = null; } ob.focus(); }
+  ob.addEventListener('click', open); cb.addEventListener('click', close);
+  m.addEventListener('click', function(e) { if (e.target === m) close(); });
+})();
+
+// Auto-compute on load
+compute();
+
+</script>
+</body>
+</html>
