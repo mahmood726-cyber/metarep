@@ -55,7 +55,7 @@ P(rep) = Phi((|theta| - z_{alpha/2} * se_new) / sqrt(tau^2 + se_new^2))
 
 where Phi is the standard normal CDF and z_{alpha/2} is the critical value (1.96 for alpha = 0.05).
 
-This formula reduces to classical power when tau^2 = 0. When tau^2 > 0, the denominator increases, reducing the replication probability. The key insight is that **heterogeneity directly attenuates replication probability** — even a small tau-squared can substantially reduce the chance that the next study will agree with the meta-analysis.
+This formula reduces to classical power when tau^2 = 0. When tau^2 > 0 and the study is adequately powered (|theta| > z * se_new), the denominator increases, reducing the replication probability. For underpowered studies, heterogeneity can paradoxically increase the probability of a chance significant result. The key practical insight is that **for well-powered, significant meta-analyses, heterogeneity directly attenuates replication probability** — even a moderate tau-squared can substantially reduce the chance that the next study will agree.
 
 ### Comparison with Classical Power
 

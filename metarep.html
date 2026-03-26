@@ -195,7 +195,7 @@
     <p>where Phi is the standard normal CDF and z_alpha = z_{alpha/2} for a two-sided test.</p>
 
     <h3>Key Insight</h3>
-    <p>Classical power analysis assumes the true effect equals the pooled estimate. MetaRep incorporates <strong>heterogeneity (tau^2)</strong> into the prediction, recognizing that the next study's true effect will differ from the pooled average. This is why "predictive power" is always &le; classical power when tau^2 > 0.</p>
+    <p>Classical power analysis assumes the true effect equals the pooled estimate. MetaRep incorporates <strong>heterogeneity (tau^2)</strong> into the prediction, recognizing that the next study's true effect will differ from the pooled average. For well-powered studies, predictive power is typically lower than classical power when tau^2 > 0. For underpowered studies, the additional variance can paradoxically increase the probability of a chance significant result.</p>
 
     <h3>Expected Replication Rate</h3>
     <p>For each of the k studies already in the meta-analysis, we compute the probability that a study of the same size would replicate, then average. This tells you: "how many of the existing studies would you expect to replicate if you re-ran them?"</p>
@@ -308,15 +308,11 @@ function seForNewStudy(scaleType, nPerArm, sePooled, k) {
     // Note: this assumes 50% event rate; lower rates → larger SE
     return Math.sqrt(2 / nPerArm);
   }
-  // Difference scale: typical per-study SE ~ sePooled * sqrt(k)
-  // Scale by sample size ratio: se_new = typicalSE * sqrt(typicalN / nPerArm)
-  // Since typicalSE ~ sePooled * sqrt(k), and typical n ~ total/k:
-  // se_new ~ sePooled * sqrt(k) * sqrt(1) for similar-sized studies
-  // More simply: treat sePooled * sqrt(k) as a single-study SE, then scale by sqrt(n_ratio)
+  // Difference scale: SE ∝ 1/sqrt(n). We know typicalSE ≈ sePooled * sqrt(k).
+  // SE_new = typicalSE * sqrt(refN / nPerArm), where refN = typical per-arm N in this domain.
+  // refN is stored in _diffRefN (set by examples or estimated from inputs).
   const typicalSE = sePooled * Math.sqrt(k);
-  // We don't know the original per-study N, so assume the typical study is n=200 per arm
-  // and scale from there: se_new = typicalSE * sqrt(200 / nPerArm)
-  const refN = 200;
+  const refN = window._diffRefN ?? 200;
   return typicalSE * Math.sqrt(refN / nPerArm);
 }
 
@@ -359,7 +355,8 @@ const EXAMPLES = {
       { label: 'Paroxetine pooled', n: 2100, effect: -2.8, se: 0.55 },
       { label: 'Escitalopram pooled', n: 1900, effect: -2.1, se: 0.52 }
     ],
-    source: 'Cipriani et al. Lancet 2018 (SMD ≈ -0.30, converted to HDRS points)'
+    typicalNPerArm: 150, // median per-arm N in Cipriani NMA pairwise comparisons
+    source: 'Cipriani et al. Lancet 2018 (pairwise approximation from NMA; SMD ≈ -0.30, converted to HDRS points)'
   }
 };
 
@@ -399,6 +396,9 @@ function compute() {
     seLog = se;
     // Same I2-to-tau2 correction: typical vi ≈ sePooled^2 * k
     tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * k * i2 / (100 - i2) : 0);
+  } else {
+    // Log scale: theta and SE already on log scale
+    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? se * se * k * i2 / (100 - i2) : 0);
   }
 
   // SE of next study at the specified sample size
@@ -416,7 +416,7 @@ function compute() {
     let sumRep = 0;
     ex.studies.forEach(s => {
       const sSeLog = scaleType === 'ratio' ? s.se / s.effect : s.se;
-      const sThLog = scaleType === 'ratio' ? Math.log(s.effect) : s.effect;
+
       // For each study, compute rep prob using a study of the same size
       const sSeNew = scaleType === 'ratio' ? Math.sqrt(4 / s.n) : sSeLog;
       const sRep = repProb(thetaLog, tau2Log, sSeNew, alpha);
@@ -484,7 +484,7 @@ function renderRepCurve(theta, tau2, sePool, k, alpha, scaleType, currentN) {
 
   for (let n = 100; n <= 20000; n += 100) {
     ns.push(n);
-    const seN = scaleType === 'ratio' ? Math.sqrt(2 / n) : sePool * Math.sqrt((2 * k) / (2 * n));
+    const seN = seForNewStudy(scaleType, n, sePool, k);
     pReps.push(repProb(theta, tau2, seN, alpha) * 100);
     pClassicals.push(classicalPower(theta, seN, alpha) * 100);
   }
@@ -548,7 +548,15 @@ se     <- ${r.se}        # SE of pooled effect
 tau2   <- ${r.tau2}       # between-study variance
 alpha  <- ${r.alpha}
 n_arm  <- ${r.nPerArm}   # sample size per arm of next study
-se_new <- sqrt(2 / n_arm) # SE of next study (log-HR/OR approx)
+scale  <- "${r.scaleType}"
+if (scale == "ratio" || scale == "log") {
+  se_new <- sqrt(2 / n_arm)   # log-HR/OR approx (assumes ~50% event rate)
+} else {
+  # Diff scale: typical study SE = se * sqrt(k); scale by n ratio
+  typical_se <- se * sqrt(${r.k})
+  ref_n <- ${window._diffRefN ?? 200}
+  se_new <- typical_se * sqrt(ref_n / n_arm)
+}
 
 # Core formula: P(replication)
 z_alpha <- qnorm(1 - alpha / 2)
@@ -568,8 +576,12 @@ cat(sprintf("Match: %s\\n", ifelse(abs(p_rep - ${r.pRep}) < 0.001, "YES", "NO"))
 
 # Replication curve
 n_range <- seq(100, 20000, by = 100)
+se_for_n <- function(n) {
+  if (scale == "ratio" || scale == "log") sqrt(2 / n)
+  else typical_se * sqrt(ref_n / n)
+}
 p_curve <- sapply(n_range, function(n) {
-  se_n <- sqrt(2 / n)
+  se_n <- se_for_n(n)
   pnorm((abs(theta) - z_alpha * se_n) / sqrt(tau2 + se_n^2))
 })
 plot(n_range, p_curve, type = "l", col = "blue", lwd = 2,
@@ -605,6 +617,7 @@ document.getElementById('exSel').addEventListener('change', function() {
   document.getElementById('alpha').value = ex.alpha;
   document.getElementById('nNew').value = ex.nNew;
   document.getElementById('nNew').setAttribute('aria-valuenow', ex.nNew);
+  window._diffRefN = ex.typicalNPerArm ?? 200; // for diff-scale SE calibration
   updateNDisp();
   compute();
 });
