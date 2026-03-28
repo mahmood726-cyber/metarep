@@ -1,0 +1,97 @@
+{
+  "title": "MetaRep: Most Significant Cochrane Meta-Analyses Predict Only 32% Replication Probability When Heterogeneity Is Accounted For",
+  "slug": "metarep",
+  "author": "Mahmood Ahmad",
+  "date": "2026-03-26",
+  "body": "What is the probability that a new clinical trial will replicate a significant Cochrane meta-analysis conclusion when between-study heterogeneity is properly accounted for? We analysed 398 Cochrane meta-analyses from the Pairwise70 dataset using restricted maximum likelihood estimation, focusing on 183 reviews with statistically significant pooled effects. MetaRep computes replication probability from the predictive distribution of a new study, incorporating both sampling error and between-study variance tau-squared into a single heterogeneity-aware power formula. Among significant meta-analyses, the median replication probability was 31.8 percent (IQR 16.0 to 63.6 percent), with 65.6 percent having replication probability below 50 percent. The primary driver was between-study heterogeneity rather than inadequate sample size, with median I-squared of 26.1 percent. Even meta-analyses deemed definitive by conventional standards predict roughly a one-in-three chance that the next appropriately sized trial will produce a significant confirmatory result. These estimates may not generalise beyond Cochrane reviews and are limited by the assumption of normally distributed between-study heterogeneity.",
+  "word_count": 156,
+  "sentence_count": 7,
+  "sentences": [
+    {
+      "role": "Question",
+      "text": "What is the probability that a new clinical trial will replicate a significant Cochrane meta-analysis conclusion when between-study heterogeneity is properly accounted for?"
+    },
+    {
+      "role": "Dataset",
+      "text": "We analysed 398 Cochrane meta-analyses from the Pairwise70 dataset using restricted maximum likelihood estimation, focusing on 183 reviews with statistically significant pooled effects."
+    },
+    {
+      "role": "Method",
+      "text": "MetaRep computes replication probability from the predictive distribution of a new study, incorporating both sampling error and between-study variance tau-squared into a single heterogeneity-aware power formula."
+    },
+    {
+      "role": "Primary result",
+      "text": "Among significant meta-analyses, the median replication probability was 31.8 percent (IQR 16.0 to 63.6 percent), with 65.6 percent having replication probability below 50 percent."
+    },
+    {
+      "role": "Robustness",
+      "text": "The primary driver was between-study heterogeneity rather than inadequate sample size, with median I-squared of 26.1 percent."
+    },
+    {
+      "role": "Interpretation",
+      "text": "Even meta-analyses deemed definitive by conventional standards predict roughly a one-in-three chance that the next appropriately sized trial will produce a significant confirmatory result."
+    },
+    {
+      "role": "Boundary",
+      "text": "These estimates may not generalise beyond Cochrane reviews and are limited by the assumption of normally distributed between-study heterogeneity."
+    }
+  ],
+  "notes": {
+    "app": "MetaRep v1.0",
+    "data": "Pairwise70 dataset: 398 Cochrane reviews, 183 with significant effects",
+    "code": "https://github.com/mahmood726-cyber/metarep",
+    "doi": "",
+    "version": "1.0",
+    "date": "2026-03-26",
+    "certainty": "moderate",
+    "validation": "DRAFT"
+  },
+  "type": "methods",
+  "primary_estimand": "Replication probability (heterogeneity-aware predictive power)",
+  "validation": {
+    "status": "pass",
+    "checks": [
+      {
+        "name": "single paragraph",
+        "ok": true,
+        "detail": "Body must not contain blank-line paragraph breaks."
+      },
+      {
+        "name": "sentence count",
+        "ok": true,
+        "detail": "Found 7 sentences."
+      },
+      {
+        "name": "word count",
+        "ok": true,
+        "detail": "Found 156 words."
+      },
+      {
+        "name": "no headings",
+        "ok": true,
+        "detail": "No markdown headings allowed in body."
+      },
+      {
+        "name": "no links",
+        "ok": true,
+        "detail": "No links or DOI links allowed in body."
+      },
+      {
+        "name": "result sentence has interval",
+        "ok": true,
+        "detail": "Sentence 4 should include a confidence interval."
+      },
+      {
+        "name": "result sentence has estimand",
+        "ok": true,
+        "detail": "Sentence 4 should name an effect measure or test metric."
+      },
+      {
+        "name": "boundary sentence present",
+        "ok": true,
+        "detail": "Sentence 7 should express a limitation, harm, or scope boundary."
+      }
+    ]
+  },
+  "schema": "e156-v0.2"
+}
