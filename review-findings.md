@@ -1,7 +1,7 @@
-# REVIEW CLEAN — Round 2 (5 Personas, All P0+P1 Fixed)
-## Multi-Persona Review: metarep.html (668 lines)
-### Date: 2026-03-26
-### Summary: R1: 3P0+7P1 fixed. R2: 1P0+5P1 fixed. Total: 4P0+12P1 = 16 fixes. 20/20 tests pass.
+# REVIEW CLEAN — Round 3 (All P0+P1+P2 Fixed)
+## Multi-Persona Review: metarep.html (669 lines)
+### Date: 2026-03-31
+### Summary: R1: 3P0+7P1. R2: 1P0+5P1. R3: 2P2. Total: 4P0+12P1+2P2 = 18 fixes. 20/20 tests pass.
 
 ---
 
@@ -25,6 +25,9 @@
 - **P1-6** [FIXED]: `Object.freeze()` on `_lastRep`
 - **P1-7** [FIXED]: tau2 tooltip + aria-describedby
 
+## Round 3 Fixes (2026-03-31)
+- **P2-2** [FIXED]: I2=100 → Infinity tau2 — clamped I2 to 99.9 in all 3 scale branches (ratio/diff/log)
+- **P2-3** [FIXED]: Dark mode gauge label contrast — added `[data-theme="dark"] .gauge-lbl{color:var(--text)}` for WCAG AA compliance (~3.3:1 → ~12:1)
+
 ## Remaining P2 (deferred)
-- I2=100 → Infinity tau2 (edge case, low impact)
-- Dark mode gauge label contrast on green background
+- None — all review findings resolved

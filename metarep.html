@@ -52,6 +52,7 @@
     .gauge.high{background:var(--green-bg)} .gauge.mod{background:var(--amber-bg)} .gauge.low{background:var(--red-bg)}
     .gauge-val{font-size:3.2rem;font-weight:900;line-height:1}
     .gauge-lbl{font-size:.82rem;color:var(--muted);margin-top:4px}
+    [data-theme="dark"] .gauge-lbl{color:var(--text)}
     .gauge-sub{font-size:.9rem;margin-top:8px}
 
     /* Metrics */
@@ -390,15 +391,15 @@ function compute() {
     seLog = se / theta;
     // tau2 on log scale: use entered tau2 if > 0; otherwise approximate from I2
     // I2 = tau2 / (tau2 + typical_vi). Typical vi ≈ sePooled^2 * k (since se_pooled ~ se_typical/sqrt(k))
-    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * k * i2 / (100 - i2) : 0);
+    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * k * Math.min(i2, 99.9) / (100 - Math.min(i2, 99.9)) : 0);
   } else if (scaleType === 'diff') {
     thetaLog = theta; // already on additive scale
     seLog = se;
     // Same I2-to-tau2 correction: typical vi ≈ sePooled^2 * k
-    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * k * i2 / (100 - i2) : 0);
+    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? seLog * seLog * k * Math.min(i2, 99.9) / (100 - Math.min(i2, 99.9)) : 0);
   } else {
     // Log scale: theta and SE already on log scale
-    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? se * se * k * i2 / (100 - i2) : 0);
+    tau2Log = tau2 > 0 ? tau2 : (i2 > 0 ? se * se * k * Math.min(i2, 99.9) / (100 - Math.min(i2, 99.9)) : 0);
   }
 
   // SE of next study at the specified sample size
