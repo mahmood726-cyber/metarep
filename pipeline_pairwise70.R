@@ -4,8 +4,11 @@
 
 suppressPackageStartupMessages(library(metafor))
 
-DATA_DIR <- "C:/Models/Pairwise70/data"
-OUT_DIR  <- "C:/Models/MetaRep/data"
+# Paths are configurable via environment variables so the pipeline is not tied
+# to one machine. DATA_DIR must contain the Pairwise70 *_data.rda files;
+# OUT_DIR defaults to this repo's ./data directory.
+DATA_DIR <- Sys.getenv("PAIRWISE70_DATA_DIR", unset = "data/pairwise70")
+OUT_DIR  <- Sys.getenv("METAREP_OUT_DIR",     unset = "data")
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 
 rda_files <- list.files(DATA_DIR, pattern = "\\.rda$", full.names = TRUE)
